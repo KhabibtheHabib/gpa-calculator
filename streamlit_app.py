@@ -1,11 +1,10 @@
 import streamlit as st
-import streamlit as st
 import pandas as pd
 from pathlib import Path
 
 # Function to create an account and save data to CSV
-def create_account(username, password, name, email):
-    data = pd.DataFrame({"Username": [username], "Password": [password], "Name": [name], "Email": [email]})
+def create_account(username, password, name, email, wanted_gpa):
+    data = pd.DataFrame({"Username": [username], "Password": [password], "Name": [name], "Email": [email], "WantedGPA": [wanted_gpa]})
     data.to_csv("user_data.csv", index=False)
 
 # Function to sign in and retrieve user data
@@ -13,6 +12,14 @@ def sign_in(username, password):
     data = pd.read_csv("user_data.csv")
     user_data = data[(data['Username'] == username) & (data['Password'] == password)]
     return user_data
+
+# Function to input grades for a signed-in user
+def input_grades(username, grades):
+    data = pd.read_csv("user_data.csv")
+    user_index = data[data['Username'] == username].index
+    for i, grade in enumerate(grades):
+        data.at[user_index, f"Grade{i + 1}"] = grade
+    data.to_csv("user_data.csv", index=False)
 
 # Streamlit app
 def main():
@@ -31,9 +38,10 @@ def main():
         password = st.text_input("Password", type="password")
         name = st.text_input("Full Name")
         email = st.text_input("Email")
+        wanted_gpa = st.number_input("Wanted GPA", min_value=0.0, max_value=4.0, step=0.1)
 
         if st.button("Create Account"):
-            create_account(username, password, name, email)
+            create_account(username, password, name, email, wanted_gpa)
             st.success("Account created successfully!")
 
     elif page == "Sign In":
@@ -45,35 +53,28 @@ def main():
             user_data = sign_in(username, password)
             if not user_data.empty:
                 st.success(f"Sign in successful! Welcome, {user_data['Name'].values[0]}")
+
+                # Show user information
                 st.write("User Information:")
                 st.write(user_data)
+
+                # Allow inputting grades
+                grades = []
+                for i in range(1, 7):
+                    grade = st.number_input(f"Grade {i}", min_value=0, max_value=4, step=0.1, key=f"grade{i}")
+                    grades.append(grade)
+
+                if st.button("Input Grades"):
+                    input_grades(username, grades)
+                    st.success("Grades inputted successfully!")
+
+                # Display actual GPA and wanted GPA
+                st.write("GPA Information:")
+                st.write(f"Actual GPA: {user_data['WantedGPA'].values[0]}")
+                st.write(f"Wanted GPA: {user_data['WantedGPA'].values[0]}")
+
             else:
                 st.error("Invalid username or password. Please try again.")
-
-if __name__ == "__main__":
-    main()
-
-# Function to calculate GPA
-def calculate_gpa(grades):
-    grade_points = {'A': 4, 'B': 3, 'C': 2, 'D': 1, 'F': 0}
-    total_points = sum(grade_points.get(grade, 0) for grade in grades)
-    return round(((total_points / len(grades)) * 100)/100)
-
-# Streamlit app
-def main():
-    st.title("GPA Calculator")
-
-    # Input fields
-    grades = []
-    for i in range(1, 7):
-        st.subheader(f"Class {i}")
-        grade = st.selectbox(f"Grade for Class {i}", ['A', 'B', 'C', 'D', 'F'])
-        grades.append(grade)
-
-    # Calculate GPA
-    if st.button("Calculate GPA"):
-        gpa = calculate_gpa(grades)
-        st.success(f"Calculated GPA: {gpa}")
 
 if __name__ == "__main__":
     main()
