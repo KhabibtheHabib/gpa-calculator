@@ -61,7 +61,7 @@ def main():
                 # Allow inputting grades
                 grades = []
                 for i in range(1, 7):
-                    grade = st.number_input(f"Grade {i}", min_value=0, max_value=4, step=0.1, key=f"grade{i}")
+                    grade = st.number_input(f"Grade {i}", min_value=0.0, max_value=4.0, step=0.1, key=f"grade{i}")
                     grades.append(grade)
 
                 if st.button("Input Grades"):
