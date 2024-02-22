@@ -4,7 +4,7 @@ import streamlit as st
 def calculate_gpa(grades):
     grade_points = {'A': 4, 'B': 3, 'C': 2, 'D': 1, 'F': 0}
     total_points = sum(grade_points.get(grade, 0) for grade in grades)
-    return round((total_points / len(grades)) * 100)
+    return round(((total_points / len(grades)) * 100)/100)
 
 # Streamlit app
 def main():
