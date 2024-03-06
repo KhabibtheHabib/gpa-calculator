@@ -1,126 +1,132 @@
-import os
-import logging
-from dotenv import load_dotenv
-import streamlit as st
-import pandas as pd
+import csv
+import tkinter as tk
+from tkinter import messagebox
+import matplotlib.pyplot as plt
 
-# Load environment variables
-load_dotenv()
-DB_PATH = os.getenv("DB_PATH", "user_data.csv")
+# Global variables
+CLASSES = 6
+USER_DATA = 'user_data.csv'
+GRADE_MAPPING = {'A+': 4.0, 'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7, 'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D+': 1.3, 'D': 1.0, 'D-': 0.7, 'F': 0.0}
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Functions
+def signup():
+    username = entry_username.get()
+    password = entry_password.get()
+    desired_gpa = float(entry_desired_gpa.get())
 
-def create_account(username, password, name, email, wanted_gpa):
-    """
-    Create a new user account and save data to the database.
+    # Check if username already exists
+    with open(USER_DATA, 'r') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            if row[0] == username:
+                messagebox.showerror("Error", "Username already exists!")
+                return
 
-    Args:
-        username (str): The username for the new account.
-        password (str): The password for the new account.
-        name (str): The full name of the user.
-        email (str): The email address of the user.
-        wanted_gpa (float): The desired GPA for the user.
+    # Create new user
+    with open(USER_DATA, 'a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([username, password, desired_gpa] + [''] * CLASSES)
 
-    Returns:
-        None
-    """
-    data = pd.DataFrame({"Username": [username], "Password": [password], "Name": [name], "Email": [email], "WantedGPA": [wanted_gpa]})
-    data.to_csv(DB_PATH, mode='a', header=False, index=False)
-    logging.info(f"New account created for {name} ({username})")
+    messagebox.showinfo("Success", "Account created successfully!")
 
-def sign_in(username, password):
-    """
-    Sign in a user and retrieve their data from the database.
+def login():
+    username = entry_username.get()
+    password = entry_password.get()
 
-    Args:
-        username (str): The username for the account.
-        password (str): The password for the account.
+    # Check if username and password are correct
+    with open(USER_DATA, 'r') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            if row[0] == username and row[1] == password:
+                show_grades_window(row)
+                return
 
-    Returns:
-        pandas.DataFrame: The user data if the sign-in is successful, otherwise an empty DataFrame.
-    """
-    data = pd.read_csv(DB_PATH)
-    user_data = data[(data['Username'] == username) & (data['Password'] == password)]
-    if not user_data.empty:
-        logging.info(f"Sign-in successful for {username}")
-        return user_data
-    else:
-        logging.warning(f"Sign-in failed for {username}")
-        return pd.DataFrame()
+    messagebox.showerror("Error", "Invalid username or password!")
 
-def input_grades(username, grades):
-    """
-    Input grades for a signed-in user and update the database.
+def show_grades_window(user_data):
+    grades_window = tk.Toplevel(root)
+    grades_window.title(f"Grades - {user_data[0]}")
 
-    Args:
-        username (str): The username for the account.
-        grades (list): A list of up to 6 grades.
+    # Labels for classes
+    class_labels = []
+    for i in range(CLASSES):
+        label = tk.Label(grades_window, text=f"Class {i+1}:")
+        label.grid(row=i, column=0)
+        class_labels.append(label)
 
-    Returns:
-        None
-    """
-    data = pd.read_csv(DB_PATH)
-    user_index = data[data['Username'] == username].index
-    for i, grade in enumerate(grades):
-        data.at[user_index, f"Grade{i + 1}"] = grade
-    data.to_csv(DB_PATH, index=False)
-    logging.info(f"Grades updated for {username}")
+    # Entry boxes for grades
+    grade_entries = []
+    for i in range(CLASSES):
+        entry = tk.Entry(grades_window)
+        entry.grid(row=i, column=1)
+        entry.insert(0, user_data[i+3])
+        grade_entries.append(entry)
 
-def main():
-    st.title("User Account Management")
+    # Save button
+    save_button = tk.Button(grades_window, text="Save", command=lambda: save_grades(user_data, grade_entries))
+    save_button.grid(row=CLASSES, column=0, columnspan=2)
 
-    # Page state
-    page = st.sidebar.radio("Navigation", ["Home", "Create Account", "Sign In"])
+    # Plot button
+    plot_button = tk.Button(grades_window, text="Plot Performance", command=lambda: plot_performance(user_data, grade_entries))
+    plot_button.grid(row=CLASSES+1, column=0, columnspan=2)
 
-    if page == "Home":
-        st.subheader("Home Page")
-        st.write("Welcome to the User Account Management App!")
+def save_grades(user_data, grade_entries):
+    with open(USER_DATA, 'r') as file:
+        reader = csv.reader(file)
+        data = list(reader)
 
-    elif page == "Create Account":
-        st.subheader("Create Account")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        name = st.text_input("Full Name")
-        email = st.text_input("Email")
-        wanted_gpa = st.number_input("Wanted GPA", min_value=0.0, max_value=4.0, step=0.1)
+    for i, row in enumerate(data):
+        if row[0] == user_data[0]:
+            for j in range(CLASSES):
+                data[i][j+3] = grade_entries[j].get().upper()
+            break
 
-        if st.button("Create Account"):
-            create_account(username, password, name, email, wanted_gpa)
-            st.success("Account created successfully!")
+    with open(USER_DATA, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(data)
 
-    elif page == "Sign In":
-        st.subheader("Sign In")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+    messagebox.showinfo("Success", "Grades saved successfully!")
 
-        if st.button("Sign In"):
-            user_data = sign_in(username, password)
+def plot_performance(user_data, grade_entries):
+    grades = [GRADE_MAPPING.get(entry.get().upper(), 0) for entry in grade_entries]
+    plt.plot(range(1, CLASSES+1), grades)
+    plt.axhline(y=user_data[2], color='r', linestyle='--', label=f'Desired GPA: {user_data[2]}')
+    plt.xlabel('Class')
+    plt.ylabel('Grade')
+    plt.title(f'Performance - {user_data[0]}')
+    plt.legend()
+    plt.show()
 
-            if not user_data.empty:
-                st.success(f"Sign in successful! Welcome, {user_data['Name'].values[0]}")
+# GUI
+root = tk.Tk()
+root.title("Grade Tracker")
 
-                # Show user information
-                st.write("User Information:")
-                st.write(user_data)
+# Signup frame
+signup_frame = tk.Frame(root)
+signup_frame.pack(padx=20, pady=20)
 
-                # Allow inputting grades
-                grades = []
-                for i in range(1, 7):
-                    grade = st.number_input(f"Grade {i}", min_value=0.0, max_value=4.0, step=0.1, key=f"grade{i}")
-                    grades.append(grade)
+label_username = tk.Label(signup_frame, text="Username:")
+label_username.grid(row=0, column=0)
 
-                if st.button("Input Grades"):
-                    input_grades(username, grades)
-                    st.success("Grades inputted successfully!")
+entry_username = tk.Entry(signup_frame)
+entry_username.grid(row=0, column=1)
 
-                # Display actual GPA and wanted GPA
-                st.write("GPA Information:")
-                st.write(f"Actual GPA: {sum(grades) / len(grades):.2f}")
-                st.write(f"Wanted GPA: {user_data['WantedGPA'].values[0]}")
+label_password = tk.Label(signup_frame, text="Password:")
+label_password.grid(row=1, column=0)
 
-            else:
-                st.error("Invalid username or password. Please try again.")
+entry_password = tk.Entry(signup_frame, show="*")
+entry_password.grid(row=1, column=1)
 
-if __name__ == "__main__":
-    main()
+label_desired_gpa = tk.Label(signup_frame, text="Desired GPA:")
+label_desired_gpa.grid(row=2, column=0)
+
+entry_desired_gpa = tk.Entry(signup_frame)
+entry_desired_gpa.grid(row=2, column=1)
+
+signup_button = tk.Button(signup_frame, text="Sign Up", command=signup)
+signup_button.grid(row=3, column=0, columnspan=2, pady=10)
+
+login_button = tk.Button(signup_frame, text="Login", command=login)
+login_button.grid(row=4, column=0, columnspan=2)
+
+root.mainloop()
