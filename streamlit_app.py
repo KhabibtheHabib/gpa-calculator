@@ -1,27 +1,72 @@
+import os
+import logging
+from dotenv import load_dotenv
 import streamlit as st
 import pandas as pd
-from pathlib import Path
 
-# Function to create an account and save data to CSV
+# Load environment variables
+load_dotenv()
+DB_PATH = os.getenv("DB_PATH", "user_data.csv")
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 def create_account(username, password, name, email, wanted_gpa):
+    """
+    Create a new user account and save data to the database.
+
+    Args:
+        username (str): The username for the new account.
+        password (str): The password for the new account.
+        name (str): The full name of the user.
+        email (str): The email address of the user.
+        wanted_gpa (float): The desired GPA for the user.
+
+    Returns:
+        None
+    """
     data = pd.DataFrame({"Username": [username], "Password": [password], "Name": [name], "Email": [email], "WantedGPA": [wanted_gpa]})
-    data.to_csv("user_data.csv", index=False)
+    data.to_csv(DB_PATH, mode='a', header=False, index=False)
+    logging.info(f"New account created for {name} ({username})")
 
-# Function to sign in and retrieve user data
 def sign_in(username, password):
-    data = pd.read_csv("user_data.csv")
-    user_data = data[(data['Username'] == username) & (data['Password'] == password)]
-    return user_data
+    """
+    Sign in a user and retrieve their data from the database.
 
-# Function to input grades for a signed-in user
+    Args:
+        username (str): The username for the account.
+        password (str): The password for the account.
+
+    Returns:
+        pandas.DataFrame: The user data if the sign-in is successful, otherwise an empty DataFrame.
+    """
+    data = pd.read_csv(DB_PATH)
+    user_data = data[(data['Username'] == username) & (data['Password'] == password)]
+    if not user_data.empty:
+        logging.info(f"Sign-in successful for {username}")
+        return user_data
+    else:
+        logging.warning(f"Sign-in failed for {username}")
+        return pd.DataFrame()
+
 def input_grades(username, grades):
-    data = pd.read_csv("user_data.csv")
+    """
+    Input grades for a signed-in user and update the database.
+
+    Args:
+        username (str): The username for the account.
+        grades (list): A list of up to 6 grades.
+
+    Returns:
+        None
+    """
+    data = pd.read_csv(DB_PATH)
     user_index = data[data['Username'] == username].index
     for i, grade in enumerate(grades):
         data.at[user_index, f"Grade{i + 1}"] = grade
-    data.to_csv("user_data.csv", index=False)
+    data.to_csv(DB_PATH, index=False)
+    logging.info(f"Grades updated for {username}")
 
-# Streamlit app
 def main():
     st.title("User Account Management")
 
@@ -51,6 +96,7 @@ def main():
 
         if st.button("Sign In"):
             user_data = sign_in(username, password)
+
             if not user_data.empty:
                 st.success(f"Sign in successful! Welcome, {user_data['Name'].values[0]}")
 
@@ -70,7 +116,7 @@ def main():
 
                 # Display actual GPA and wanted GPA
                 st.write("GPA Information:")
-                st.write(f"Actual GPA: {user_data['WantedGPA'].values[0]}")
+                st.write(f"Actual GPA: {sum(grades) / len(grades):.2f}")
                 st.write(f"Wanted GPA: {user_data['WantedGPA'].values[0]}")
 
             else:
